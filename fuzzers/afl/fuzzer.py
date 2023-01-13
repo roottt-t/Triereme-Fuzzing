@@ -63,14 +63,15 @@ def get_stats(output_corpus, fuzzer_log):  # pylint: disable=unused-argument
     return json.dumps(stats)
 
 
-def prepare_fuzz_environment(input_corpus):
+def prepare_fuzz_environment(input_corpus, no_affinity=True):
     """Prepare to fuzz with AFL or another AFL-based fuzzer."""
     # Tell AFL to not use its terminal UI so we get usable logs.
     os.environ['AFL_NO_UI'] = '1'
     # Skip AFL's CPU frequency check (fails on Docker).
     os.environ['AFL_SKIP_CPUFREQ'] = '1'
     # No need to bind affinity to one core, Docker enforces 1 core usage.
-    os.environ['AFL_NO_AFFINITY'] = '1'
+    if no_affinity:
+        os.environ['AFL_NO_AFFINITY'] = '1'
     # AFL will abort on startup if the core pattern sends notifications to
     # external programs. We don't care about this.
     os.environ['AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES'] = '1'
@@ -97,7 +98,8 @@ def run_afl_fuzz(input_corpus,
                  output_corpus,
                  target_binary,
                  additional_flags=None,
-                 hide_output=False):
+                 hide_output=False,
+                 fork_mode=False):
     """Run afl-fuzz."""
     # Spawn the afl fuzzing process.
     print('[run_afl_fuzz] Running target with afl-fuzz')
@@ -125,10 +127,15 @@ def run_afl_fuzz(input_corpus,
     command += [
         '--',
         target_binary,
+    ]
+
+    if fork_mode:
+        command.append('@@')
+    else:
         # Pass INT_MAX to afl the maximize the number of persistent loops it
         # performs.
-        '2147483647'
-    ]
+        command.append('2147483647')
+
     print('[run_afl_fuzz] Running command: ' + ' '.join(command))
     output_stream = subprocess.DEVNULL if hide_output else None
     subprocess.check_call(command, stdout=output_stream, stderr=output_stream)

@@ -241,7 +241,9 @@ def fuzz(input_corpus,
          target_binary,
          flags=tuple(),
          skip=False,
-         no_cmplog=False):  # pylint: disable=too-many-arguments
+         no_cmplog=False,
+         fork_mode=False,
+         no_affinity=True):  # pylint: disable=too-many-arguments
     """Run fuzzer."""
     # Calculate CmpLog binary path from the instrumented target binary.
     target_binary_directory = os.path.dirname(target_binary)
@@ -251,7 +253,7 @@ def fuzz(input_corpus,
     cmplog_target_binary = os.path.join(cmplog_target_binary_directory,
                                         target_binary_name)
 
-    afl_fuzzer.prepare_fuzz_environment(input_corpus)
+    afl_fuzzer.prepare_fuzz_environment(input_corpus, no_affinity)
     # decomment this to enable libdislocator.
     # os.environ['AFL_ALIGNED_ALLOC'] = '1' # align malloc to max_align_t
     # os.environ['AFL_PRELOAD'] = '/afl/libdislocator.so'
@@ -279,4 +281,5 @@ def fuzz(input_corpus,
     afl_fuzzer.run_afl_fuzz(input_corpus,
                             output_corpus,
                             target_binary,
-                            additional_flags=flags)
+                            additional_flags=flags,
+                            fork_mode=fork_mode)

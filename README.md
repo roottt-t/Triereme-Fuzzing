@@ -1,61 +1,122 @@
-# FuzzBench: Fuzzer Benchmarking As a Service
+# FuzzBench Fork for Triereme Evaluation
 
-FuzzBench is a free service that evaluates fuzzers on a wide variety of
-real-world benchmarks, at Google scale. The goal of FuzzBench is to make it
-painless to rigorously evaluate fuzzing research and make fuzzing research
-easier for the community to adopt. We invite members of the research community
-to contribute their fuzzers and give us feedback on improving our evaluation
-techniques.
+This FuzzBench fork contains the code necessary to run all the experiments in
+the paper "Triereme: Speeding up hybrid fuzzing through efficient query
+scheduling". The code for the fuzzer can be found in [this][triereme]
+repository.
 
-FuzzBench provides:
+This fork contains 8 additional fuzzers (`aflplusplus_cmplog_forkmode`,
+`aflplusplus_cmplog_forkmode_double`, `symcc_libafl_single`,
+`symcc_libafl_double`, `triereme_linear_single`, `triereme_linear_double`,
+`triereme_trie_single`, `triereme_trie_double`).
 
-* An easy API for integrating fuzzers.
-* Benchmarks from real-world projects. FuzzBench can use any
-  [OSS-Fuzz](https://github.com/google/oss-fuzz) project as a benchmark.
-* A reporting library that produces reports with graphs and statistical tests
-  to help you understand the significance of results.
+We refer to the original [FuzzBench documentation][fuzzbench-docs] for
+troubleshooting and setup customization, as it contains a detailed overview of
+all the supported options.
 
-To participate, submit your fuzzer to run on the FuzzBench platform by following
-[our simple guide](
-https://google.github.io/fuzzbench/getting-started/).
-After your integration is accepted, we will run a large-scale experiment using
-your fuzzer and generate a report comparing your fuzzer to others.
-See [a sample report](https://www.fuzzbench.com/reports/sample/index.html).
-
-## Overview
-<kbd>
-  
-![FuzzBench Service diagram](docs/images/FuzzBench-service.png)
-  
-</kbd>
+[fuzzbench-docs]: https://google.github.io/fuzzbench/
 
 
-## Sample Report
+## Preparation
 
-You can view our sample report
-[here](https://www.fuzzbench.com/reports/sample/index.html) and
-our periodically generated reports
-[here](https://www.fuzzbench.com/reports/index.html).
-The sample report is generated using 10 fuzzers against 24 real-world
-benchmarks, with 20 trials each and over a duration of 24 hours.
-The raw data in compressed CSV format can be found at the end of the report.
+FuzzBench requires only Python 3.10 and Docker to run. Since we have run our
+evaluation on Ubuntu 20.04 , we recommend running on that distro as it is the
+configuration we can provide support for.
 
-When analyzing reports, we recommend:
-* Checking the strengths and weaknesses of a fuzzer against various benchmarks.
-* Looking at aggregate results to understand the overall significance of the
-  result.
+You can install Docker following the instructions in the [official
+documentation][docker-docs].
 
-Please provide feedback on any inaccuracies and potential improvements (such as
-integration changes, new benchmarks, etc.) by opening a GitHub issue
-[here](https://github.com/google/fuzzbench/issues/new).
+[docker-docs]: https://docs.docker.com/engine/install/ubuntu/
 
-## Documentation
+In order to install Python 3.10, use the following commands:
 
-Read our [detailed documentation](https://google.github.io/fuzzbench/) to learn
-how to use FuzzBench.
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt install python3.10 python3.10-dev python3.10-venv libpq-dev
+```
 
-## Contacts
+The setup can then be finished following the FuzzBench
+[documentation][fuzzbench-prereq].
 
-Join our [mailing list](https://groups.google.com/forum/#!forum/fuzzbench-users)
-for discussions and announcements, or send us a private email at
-[fuzzbench@google.com](mailto:fuzzbench@google.com).
+[fuzzbench-prereq]: https://google.github.io/fuzzbench/getting-started/prerequisites/
+
+
+## Running experiments
+
+In order to run experiments you will need a configuration file. The one we used
+for our experiments is the following (adjust the paths to your machine):
+
+```yaml
+# The number of trials of a fuzzer-benchmark pair.
+trials: 16
+
+# The amount of time in seconds that each trial is run for.
+# 23 hours = 23 * 60 * 60 = 82800
+max_total_time: 82800
+
+# The location of the docker registry.
+# FIXME: Support custom docker registry.
+# See https://github.com/google/fuzzbench/issues/777
+docker_registry: gcr.io/fuzzbench
+
+# The local experiment folder that will store most of the experiment data.
+# Please use an absolute path.
+experiment_filestore: /home/ubuntu/triereme-experiments/experiment-data
+
+# The local report folder where HTML reports and summary data will be stored.
+# Please use an absolute path.
+report_filestore: /home/ubuntu/triereme-experiments/report-data
+
+# Flag that indicates this is a local experiment.
+local_experiment: true
+```
+
+You can then start experiments using the following command line:
+
+```bash
+PYTHONPATH=. python3 experiment/run_experiment.py \
+  --experiment-config ${config_file} \
+  --concurrent-builds 2 \
+  --runners-cpus 32 \
+  --measurers-cpus 32 \
+  --experiment-name ${experiment_name} \
+  --fuzzers \
+      aflplusplus_cmplog_forkmode \
+      symcc_libafl_single \
+      triereme_linear_single \
+      triereme_trie_single \
+  --benchmarks ${benchmark_list[@]}
+```
+
+It is important to note that you should avoid committing more cores than the
+total amount available on your machine. That command is for a machine with 64
+cores. If you run out of RAM while building, you may want to reduce the
+concurrent builds to 1. Make sure to use only benchmarks that are listed in the
+paper, the others are not supported.
+
+
+## Results analysis
+
+Albeit graphically different from the plots in the paper, FuzzBench will
+automatically generate an HTML report with coverage data.
+
+The other data, which was used to generate the tables, can be extracted from the
+experiment logs with the following two [scripts][triereme-scripts], which are
+part of the fuzzer repository.
+
+```bash
+python3 ${triereme_root}/fuzzbench/extract_symcc_libafl_stats.py \
+  ${experiment_filestore} ${experiment_name} ${output_dir}
+
+python3 ${triereme_root}/fuzzbench/extract_trace_stats.py \
+  ${experiment_filestore} ${experiment_name} ${output_dir}
+```
+
+Both scripts store the data extracted from the logs in a format that can be
+easily processed with `pandas`. The compressed dataframes can be found in the
+output folders. The experiment filestore can be on the on the local file system
+or on a remote GCS bucket.
+
+[triereme]: https://github.com/vusec/triereme
+[triereme-scripts]: https://github.com/vusec/triereme/tree/main/fuzzbench
+

@@ -54,6 +54,7 @@ docker run \
 -e FUZZ_TARGET={{fuzz_target}} \
 -e PRIVATE={{private}} \
 -e LOCAL_EXPERIMENT={{local_experiment}} \
+{% if cpuset %}-e CPUSET={{cpuset}} {% endif %}\
 {% if not local_experiment %}--name=runner-container {% endif %}\
 --shm-size=2g \
 --cap-add SYS_NICE --cap-add SYS_PTRACE \
