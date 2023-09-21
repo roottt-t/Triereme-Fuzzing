@@ -102,9 +102,14 @@ automatically generate an HTML report with coverage data.
 
 The other data, which was used to generate the tables, can be extracted from the
 experiment logs with the following two [scripts][triereme-scripts], which are
-part of the fuzzer repository.
+part of the fuzzer repository. Their dependencies are listed in a
+`requirements.txt` file in the same folder.
 
 ```bash
+python3 -m venv ${path_to_venv}
+source ${path_to_venv}/bin/activate
+python3 -m pip install -r ${triereme_root}/fuzzbench/requirements.txt
+
 python3 ${triereme_root}/fuzzbench/extract_symcc_libafl_stats.py \
   ${experiment_filestore} ${experiment_name} ${output_dir}
 
